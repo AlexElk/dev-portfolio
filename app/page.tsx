@@ -1,10 +1,10 @@
-import Scene from "@/components/Scene";
+import GameCanvas from "@/src/components/GameCanvas";
 
 export default function Home()
 {
   return(
     <main>  
-      <Scene />
+      <GameCanvas/>
     </main>
   );
 }
