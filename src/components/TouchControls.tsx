@@ -10,62 +10,70 @@ export default function TouchControls({input}: TouchControlProps)
 {
     if (!input) return null;
 
-    const handleDirection = (key: 'w' | 'a' | 's' | 'd', active: boolean) => {
+    const handleDirection = (e: React.TouchEvent | React.MouseEvent, key: 'w' | 'a' | 's' | 'd', active: boolean) => {
+        e.stopPropagation();
         input.setKey(key, active);
     }
 
+    const handleAction = (e: React.TouchEvent | React.MouseEvent) => {
+        e.stopPropagation();
+        if (e.type === 'touchstart' || e.type === 'click') {
+        input.handleSpace();
+        }
+    };
+
     return (
         <div className="touch-overlay">
-        {/* Cruceta / D-Pad direccional */}
+        {/* D-Pad */}
         <div className="dpad">
             <button
             className="btn dpad-up"
-            onTouchStart={() => handleDirection('w', true)}
-            onTouchEnd={() => handleDirection('w', false)}
-            onMouseDown={() => handleDirection('w', true)}
-            onMouseUp={() => handleDirection('w', false)}
+            onTouchStart={(e) => handleDirection(e, 'w', true)}
+            onTouchEnd={(e) => handleDirection(e, 'w', false)}
+            onMouseDown={(e) => handleDirection(e, 'w', true)}
+            onMouseUp={(e) => handleDirection(e, 'w', false)}
             >
             ▲
             </button>
             <div className="dpad-row">
             <button
                 className="btn dpad-left"
-                onTouchStart={() => handleDirection('a', true)}
-                onTouchEnd={() => handleDirection('a', false)}
-                onMouseDown={() => handleDirection('a', true)}
-                onMouseUp={() => handleDirection('a', false)}
+                onTouchStart={(e) => handleDirection(e, 'a', true)}
+                onTouchEnd={(e) => handleDirection(e, 'a', false)}
+                onMouseDown={(e) => handleDirection(e, 'a', true)}
+                onMouseUp={(e) => handleDirection(e, 'a', false)}
             >
                 ◀
             </button>
             <button
                 className="btn dpad-right"
-                onTouchStart={() => handleDirection('d', true)}
-                onTouchEnd={() => handleDirection('d', false)}
-                onMouseDown={() => handleDirection('d', true)}
-                onMouseUp={() => handleDirection('d', false)}
+                onTouchStart={(e) => handleDirection(e, 'd', true)}
+                onTouchEnd={(e) => handleDirection(e, 'd', false)}
+                onMouseDown={(e) => handleDirection(e, 'd', true)}
+                onMouseUp={(e) => handleDirection(e, 'd', false)}
             >
                 ▶
             </button>
             </div>
             <button
             className="btn dpad-down"
-            onTouchStart={() => handleDirection('s', true)}
-            onTouchEnd={() => handleDirection('s', false)}
-            onMouseDown={() => handleDirection('s', true)}
-            onMouseUp={() => handleDirection('s', false)}
+            onTouchStart={(e) => handleDirection(e, 's', true)}
+            onTouchEnd={(e) => handleDirection(e, 's', false)}
+            onMouseDown={(e) => handleDirection(e, 's', true)}
+            onMouseUp={(e) => handleDirection(e, 's', false)}
             >
             ▼
             </button>
         </div>
 
-        {/* Botón de Acción (Espacio) */}
+        {/* Action Button */}
         <div className="action-container">
             <button
             className="btn btn-action"
-            onTouchStart={() => input.handleSpace()}
-            onClick={() => input.handleSpace()}
+            onTouchStart={handleAction}
+            onClick={handleAction}
             >
-            ESPACIO
+            ACTION
             </button>
         </div>
 
