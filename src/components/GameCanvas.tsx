@@ -1,135 +1,132 @@
+// src/components/GameCanvas.tsx
 'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { createScene } from "../game/SceneSetUp";
-import { InputHandler } from "../game/InputHandler";
-import { Player } from "../game/Player";
-import { CameraController } from "../game/CameraController";
-import TouchControlls from "./TouchControls";
-import { SceneManager, SceneType } from "../game/SceneManager";
-import { MenuScene } from "../game/scenes/MenuScene";
-import { OverworldScene } from "../game/scenes/OverworldScene";
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { createScene } from '../game/SceneSetUp';
+import { InputHandler } from '../game/InputHandler';
+import { Player } from '../game/Player';
+import { CameraController } from '../game/CameraController';
+import { setupOverworldScene, setupInteriorScene, HouseTrigger } from '../game/Scenes';
+import TouchControls from './TouchControls';
+import MenuOverlay from './MenuOverlay';
+import InteractionPrompt from './InteractionPrompt';
+
+type SceneState = 'MENU' | 'OVERWORLD' | 'INTERIOR';
 
 export default function GameCanvas() {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [inputHandler, setInputHandler] = useState<InputHandler | null>(null);
-    const [currentSceneType, setCurrentSceneType] = useState<SceneType>('MENU');
-    const sceneManagerRef = useRef<SceneManager | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Estados del juego
+  const [sceneState, setSceneState] = useState<SceneState>('MENU');
+  const [inputHandler, setInputHandler] = useState<InputHandler | null>(null);
+  const [camera, setCamera] = useState<THREE.Camera | null>(null);
 
-    useEffect(() => {
-        if (!containerRef.current) return;
+  // Estado para el prompt flotante
+  const [promptData, setPromptData] = useState<{
+    visible: boolean;
+    position: THREE.Vector3 | null;
+    text: string;
+  }>({ visible: false, position: null, text: '' });
 
-        const {renderer, cleanup: cleanupScene} = createScene(containerRef.current);
-        const input = new InputHandler();
-        setInputHandler(input);
+  const activeTriggerRef = useRef<HouseTrigger | null>(null);
 
-        const manager = new SceneManager((type) => setCurrentSceneType(type));
-        sceneManagerRef.current = manager;
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-        manager.changeScene(new MenuScene, 'MENU');
+    const { scene, camera: mainCam, renderer, cleanup: cleanupScene } = createScene(containerRef.current);
+    const input = new InputHandler();
+    const player = new Player();
+    const cameraController = new CameraController(mainCam, containerRef.current);
 
-        //Animation Loop
-        let animId: number;
-        const animate = () => {
-            animId = requestAnimationFrame(animate);
+    setCamera(mainCam);
+    setInputHandler(input);
 
-            if (manager.currentScene){
-                manager.update(input);
-                renderer.render(manager.currentScene.scene, manager.currentScene.camera);
-            }
-        };
+    let triggers: HouseTrigger[] = [];
 
-        animate();
+    // Cargar elementos 3D según el estado actual
+    if (sceneState === 'OVERWORLD') {
+      scene.add(player.mesh);
+      triggers = setupOverworldScene(scene);
+    } else if (sceneState === 'INTERIOR') {
+      player.mesh.position.set(0, 0.5, 2); // Posición de entrada
+      scene.add(player.mesh);
+      triggers = setupInteriorScene(scene);
+    }
 
-        return () => {
-            cancelAnimationFrame(animId);
-            input.destroy();
-            if (manager.currentScene) manager.currentScene.destroy();
-            cleanupScene();
-        };
-    }, []);
-
-    const handleStartGame = () => {
-        if(sceneManagerRef.current && containerRef.current){
-            sceneManagerRef.current.changeScene(
-                new OverworldScene(containerRef.current, sceneManagerRef.current),
-                'OVERWORLD'
-            );
+    // Sobrescribir la acción de la tecla Espacio
+    input.handleSpace = () => {
+      if (activeTriggerRef.current) {
+        if (activeTriggerRef.current.type === 'ENTER') {
+          setSceneState('INTERIOR');
+        } else if (activeTriggerRef.current.type === 'EXIT') {
+          setSceneState('OVERWORLD');
         }
+      }
     };
 
-    return (
-        <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
-        <div ref={containerRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
+    let animId: number;
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
 
-        {/* OVERLAY DEL MENÚ PRINCIPAL */}
-        {currentSceneType === 'MENU' && (
-            <div className="menu-overlay">
-            <h1 className="title">AlexElk</h1>
-            <div className="button-group">
-                <button className="menu-btn" onClick={handleStartGame}>
-                Start
-                </button>
-                <a
-                href="https://github.com/AlexElk"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="menu-btn github-btn"
-                >
-                Github
-                </a>
-            </div>
-            </div>
-        )}
+      if (sceneState !== 'MENU') {
+        player.update(input, cameraController.yaw);
+        cameraController.update(player.mesh.position);
 
-        {/* Tactile Control*/}
-        {currentSceneType !== 'MENU' && <TouchControlls input={inputHandler} />}
+        // Detectar cercanía con zonas de interacción
+        let nearTrigger: HouseTrigger | null = null;
+        for (const trigger of triggers) {
+          const dist = player.mesh.position.distanceTo(trigger.position);
+          if (dist < 1.5) {
+            nearTrigger = trigger;
+            break;
+          }
+        }
 
-        <style jsx>{`
-            .menu-overlay {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 24px;
-            z-index: 20;
-            background: rgba(0, 0, 0, 0.4);
-            font-family: monospace;
-            }
+        activeTriggerRef.current = nearTrigger;
 
-            .title {
-            color: #00ff88;
-            font-size: 3rem;
-            text-shadow: 2px 2px #000;
-            letter-spacing: 2px;
-            }
+        if (nearTrigger) {
+          setPromptData({
+            visible: true,
+            position: nearTrigger.promptPosition,
+            text: nearTrigger.type === 'ENTER' ? '' : '', //Enter or Exit
+          });
+        } else {
+          setPromptData((prev) => ({ ...prev, visible: false }));
+        }
+      }
 
-            .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            }
+      renderer.render(scene, mainCam);
+    };
 
-            .menu-btn {
-            padding: 12px 24px;
-            font-size: 1.2rem;
-            font-family: monospace;
-            background: #111;
-            color: #fff;
-            border: 2px solid #00ff88;
-            cursor: pointer;
-            text-align: center;
-            text-decoration: none;
-            transition: all 0.2s;
-            }
+    animate();
 
-            .menu-btn:hover {
-            background: #00ff88;
-            color: #000;
-            }
-        `}</style>
-        </div>
-    );
+    return () => {
+      cancelAnimationFrame(animId);
+      input.destroy();
+      cleanupScene();
+    };
+  }, [sceneState]);
+
+  return (
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
+
+      {/* Menú Principal */}
+      {sceneState === 'MENU' && (
+        <MenuOverlay onStart={() => setSceneState('OVERWORLD')} />
+      )}
+
+      {/* Texto Flotante Reutilizable */}
+      <InteractionPrompt
+        visible={promptData.visible && sceneState !== 'MENU'}
+        position={promptData.position}
+        camera={camera}
+        text={promptData.text}
+      />
+
+      {/* Controles Táctiles (solo fuera del menú) */}
+      {sceneState !== 'MENU' && <TouchControls input={inputHandler} />}
+    </div>
+  );
 }

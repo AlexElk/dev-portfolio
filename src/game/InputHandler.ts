@@ -12,6 +12,12 @@ export class InputHandler{
     }
 
     private handleKeyDown = (e: KeyboardEvent) => {
+        if (e.code === 'Space' || e.key === ' ') {
+            e.preventDefault();
+            this.handleSpace();
+            return;
+        }
+
         const key = e.key.toLowerCase();
         if(key in this.keys)
         {
