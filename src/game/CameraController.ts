@@ -31,7 +31,7 @@ export class CameraController{
         const deltaX = e.clientX - this.previousMouse.x;
         const deltaY = e.clientY - this.previousMouse.y;
 
-        this.rotate(deltaX * 0.005, deltaY * 0.0005);
+        this.rotate(deltaX * 0.005, deltaY * 0.003);
         this.previousMouse = {x: e.clientX, y: e.clientY};
     });
 
@@ -69,7 +69,7 @@ export class CameraController{
 
         //Spheric coordinates to position the camera around the player
         const offSetX = this.distance * Math.sin(this.yaw) * Math.cos(this.pitch);
-        const offSetY = this.distance * Math.sin(this.yaw);
+        const offSetY = this.distance * Math.sin(this.pitch);
         const offSetZ = this.distance * Math.cos(this.yaw) * Math.cos(this.pitch);
 
         this.camera.position.set(
