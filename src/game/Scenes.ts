@@ -6,7 +6,13 @@ export interface HouseTrigger {
   type: 'ENTER' | 'EXIT';
 }
 
-export function setupOverworldScene(scene: THREE.Scene): HouseTrigger[] {
+export interface NPCData {
+    position: THREE.Vector3;
+    name: string;
+    lines: string[];
+}
+
+export function setupOverworldScene(scene: THREE.Scene) {
   // Suelo
   const grid = new THREE.GridHelper(30, 30, 0x00ff88, 0x444444);
   scene.add(grid);
@@ -42,7 +48,23 @@ export function setupOverworldScene(scene: THREE.Scene): HouseTrigger[] {
     });
   });
 
-  return triggers;
+  //NPC
+  const npcPosition = new THREE.Vector3(0, 0.5, -3);
+  const npcMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({color: 0x0088ff}));
+  npcMesh.position.copy(npcPosition);
+  scene.add(npcMesh);
+
+  const npcData: NPCData = {
+    position: npcPosition,
+    name: 'Old guy',
+    lines: [
+        'Hello! I make games using a toaster',
+        'You can see around what I had made',
+        'Interact using Space'
+    ],
+  };
+
+  return {triggers, npcData};
 }
 
 // Inside
