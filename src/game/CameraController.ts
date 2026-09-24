@@ -11,6 +11,7 @@ export class CameraController{
     private isDragging = false;
     private previousMouse = {x: 0, y: 0}
     private previousTouch = {x: 0, y: 0}
+    private touchId: number | null = null;
 
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement)
     {
@@ -41,16 +42,37 @@ export class CameraController{
     //touch
 
     element.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1)
-        {
-            const touch = e.touches[0];
-            const deltaX = touch.clientX - this.previousTouch.x;
-            const deltaY = touch.clientY - this.previousTouch.y;
+        if (e.touches.length !== 1) return;
 
-            this.rotate(deltaX * 0.0005, deltaY * 0.0005);
-            this.previousTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
-        }
+        const touch = e.touches[0];
+        this.touchId = touch.identifier;
+        this.previousTouch = {x: touch.clientX, y: touch.clientY};
     }, {passive: true});
+
+    element.addEventListener('touchmove', (e) => {
+        if (this.touchId === null) return;
+
+        const touch = Array.from(e.touches).find(({identifier}) => identifier === this.touchId);
+        if (!touch) return;
+
+        const deltaX = touch.clientX - this.previousTouch.x;
+        const deltaY = touch.clientY - this.previousTouch.y;
+
+        this.rotate(deltaX * 0.005, deltaY * 0.003);
+        this.previousTouch = {x: touch.clientX, y: touch.clientY};
+    }, {passive: true});
+
+    const stopTouchDrag = (e: TouchEvent) => {
+        if (this.touchId === null) return;
+
+        const touchEnded = Array.from(e.changedTouches)
+            .some(({identifier}) => identifier === this.touchId);
+
+        if (touchEnded) this.touchId = null;
+    };
+
+    element.addEventListener('touchend', stopTouchDrag, {passive: true});
+    element.addEventListener('touchcancel', stopTouchDrag, {passive: true});
     }
 
     private rotate(deltaYaw: number, deltaPitch: number){
