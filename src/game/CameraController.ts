@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 export class CameraController{
     public camera: THREE.PerspectiveCamera;
+    public domElement: HTMLElement;
     public yaw = 0; //Horizontal Angle
     public pitch = 0.3 //Vertical Angle
 
@@ -16,6 +17,7 @@ export class CameraController{
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement)
     {
         this.camera = camera;
+        this.domElement = domElement;
         this.setupEvents(domElement);
     }
 
