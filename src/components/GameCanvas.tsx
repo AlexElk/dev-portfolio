@@ -68,7 +68,7 @@ export default function GameCanvas() {
       triggers = setupInteriorScene(scene);
     }
 
-    // Sobrescribir la acción de la tecla Espacio
+    // Sobrescribir la acción de la tecla E
     input.handleSpace = () => {
         if (isDialogueActiveRef.current) return;
 
@@ -98,7 +98,7 @@ export default function GameCanvas() {
       if (sceneState !== 'MENU') {
 
         if (!isDialogueActiveRef.current) {
-          player.update(input, cameraController.yaw);
+          player.update(input, cameraController.yaw, mainCam);
         }
         cameraController.update(player.mesh.position);
 

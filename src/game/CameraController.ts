@@ -12,6 +12,8 @@ export class CameraController{
     private inDialog = false;
     private dialogueCamPos = new THREE.Vector3();
     private dialogueLookAt = new THREE.Vector3()
+    private surfaceForward = new THREE.Vector3(0, 0, -1);
+    private surfaceRight = new THREE.Vector3(1, 0, 0);
 
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement)
     {
@@ -113,7 +115,11 @@ export class CameraController{
     }
 
     public update(targetPosition: THREE.Vector3)
-    {
+    {   
+        const up = targetPosition.clone().normalize();
+
+        this.camera.up.lerp(up, 0.1);
+
         if (this.inDialog){
             //Smooth transition
             this.camera.position.lerp(this.dialogueCamPos, 0.08);
@@ -121,15 +127,45 @@ export class CameraController{
             return;
         }
 
-        //where the camera looks
-        const target = targetPosition.clone().add(new THREE.Vector3(0, this.heightOffset , 0));
-        //Spheric coordinates to position the camera around the player
-        const offSetX = this.distance * Math.sin(this.yaw) * Math.cos(this.pitch);
-        const offSetY = this.distance * Math.sin(this.pitch);
-        const offSetZ = this.distance * Math.cos(this.yaw) * Math.cos(this.pitch);
+        // Project the previous tangent onto the new tangent plane. This keeps
+        // the camera orientation continuous while crossing the poles.
+        const forward = this.surfaceForward
+            .sub(up.clone().multiplyScalar(this.surfaceForward.dot(up)));
 
-        const desiredPos = new THREE.Vector3(target.x + offSetX, target.y + offSetY, target.z + offSetZ);
-        this.camera.position.lerp(desiredPos, 0.1); //smooth transition
-        this.camera.lookAt(target);
+        if (forward.lengthSq() < 1e-6) {
+            forward.copy(this.surfaceRight)
+                .sub(up.clone().multiplyScalar(this.surfaceRight.dot(up)));
+        }
+
+        if (forward.lengthSq() < 1e-6) {
+            forward.set(1, 0, 0)
+                .sub(up.clone().multiplyScalar(up.x));
+        }
+
+        forward.normalize();
+        this.surfaceRight.crossVectors(forward, up).normalize();
+        forward.crossVectors(up, this.surfaceRight).normalize();
+        this.surfaceForward.copy(forward);
+
+        const rotatedForward = forward.clone().applyAxisAngle(up, this.yaw);
+
+        const camOffset = rotatedForward.clone().multiplyScalar(-this.distance * Math.cos(this.pitch))
+            .add(up.clone().multiplyScalar(this.distance * Math.sin(this.pitch)));
+
+        const targetPos = targetPosition.clone().add(up.clone().multiplyScalar(1.0));
+        const desiredCamPos = targetPos.clone().add(camOffset);
+
+        this.camera.position.lerp(desiredCamPos, 0.1); //smooth transition
+        this.camera.lookAt(targetPos);
+        
+        //Wher it is not a sphere
+        // //where the camera looks
+        // const target = targetPosition.clone().add(new THREE.Vector3(0, this.heightOffset , 0));
+        // //Spheric coordinates to position the camera around the player
+        // const offSetX = this.distance * Math.sin(this.yaw) * Math.cos(this.pitch);
+        // const offSetY = this.distance * Math.sin(this.pitch);
+        // const offSetZ = this.distance * Math.cos(this.yaw) * Math.cos(this.pitch);
+
+        // const desiredPos = new THREE.Vector3(target.x + offSetX, target.y + offSetY, target.z + offSetZ);
     }
 }

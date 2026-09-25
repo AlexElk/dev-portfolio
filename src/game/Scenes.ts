@@ -12,55 +12,103 @@ export interface NPCData {
     lines: string[];
 }
 
-export function setupOverworldScene(scene: THREE.Scene) {
-  // Suelo
-  const grid = new THREE.GridHelper(30, 30, 0x00ff88, 0x444444);
-  scene.add(grid);
+export function alignToSphere(
+  object: THREE.Object3D,
+  dir: THREE.Vector3,
+  radius: number = 10,
+  offsetHeight: number = 0
+){
+  const normal = dir.clone().normalize();
+  object.position.copy(normal.clone().multiplyScalar(radius + offsetHeight));
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+  object.quaternion.copy(q);
+}
 
-  const housePositions = [
-    new THREE.Vector3(-6, 0, -5),
-    new THREE.Vector3(6, 0, -5),
-    new THREE.Vector3(0, 0, -12),
-  ];
+export function setupOverworldScene(scene: THREE.Scene) {
+
+  const PLANET_RADIUS = 10;
+  scene.background = new THREE.Color(0x020208);
+
+  //Stern
+  const starsGeo = new THREE.BufferGeometry();
+  const count = 1200;
+  const position = new Float32Array(count * 3);
+  for (let i = 0; i < count * 3; i++){
+    position[i] = (Math.random() - 0.5) * 250;
+  }
+  starsGeo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  const starsMat = new THREE.PointsMaterial({color: 0xffffff, size: 0.8});
+  scene.add(new THREE.Points(starsGeo, starsMat));
+
+  //Kugel
+  const planetGeo = new THREE.SphereGeometry(PLANET_RADIUS, 64, 64);
+  const planetMat = new THREE.MeshBasicMaterial({color: 0x228b22, wireframe: false, reflectivity: 0.2}) //Roughness here?
+  const planet = new THREE.Mesh(planetGeo, planetMat);
+  scene.add(planet);
+  
+  const houseDirections = [
+    new THREE.Vector3(-0.5, 0.8, -0.3),
+    new THREE.Vector3(0.6, 0.7, 0.4),
+    new THREE.Vector3(-0.5, 0.8, 0.3)
+  ]
 
   const triggers: HouseTrigger[] = [];
 
-  housePositions.forEach((pos) => {
-    // Estructura de la Casa 
-    const houseGeo = new THREE.BoxGeometry(3, 3, 3);
-    const houseMat = new THREE.MeshStandardMaterial({ color: 0xaa4444 });
-    const house = new THREE.Mesh(houseGeo, houseMat);
-    house.position.set(pos.x, 1.5, pos.z);
+  houseDirections.forEach((dir) => {
+    const house = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 2.5, 2.5),
+      new THREE.MeshStandardMaterial({color: 0xaa4444})
+    );
+    alignToSphere(house, dir, PLANET_RADIUS, 1.25);
     scene.add(house);
 
-    // Doa
-    const doorGeo = new THREE.BoxGeometry(0.8, 1.6, 0.1);
-    const doorMat = new THREE.MeshStandardMaterial({ color: 0x442211 });
-    const door = new THREE.Mesh(doorGeo, doorMat);
-    door.position.set(pos.x, 0.8, pos.z + 1.5);
-    scene.add(door);
+    const normal = dir.clone().normalize();
+    const triggerPos = normal.clone().multiplyScalar(PLANET_RADIUS + 0.5);
+    const promptPos = normal.clone().multiplyScalar(PLANET_RADIUS + 3.2);
 
-    // Activation Point
     triggers.push({
-      position: new THREE.Vector3(pos.x, 0.5, pos.z + 2.2),
-      promptPosition: new THREE.Vector3(pos.x, 2.5, pos.z + 1.5),
-      type: 'ENTER',
+      position: triggerPos,
+      promptPosition: promptPos,
+      type: 'ENTER'
     });
   });
 
+  // housePositions.forEach((pos) => {
+  //   // Estructura de la Casa 
+  //   const houseGeo = new THREE.BoxGeometry(3, 3, 3);
+  //   const houseMat = new THREE.MeshStandardMaterial({ color: 0xaa4444 });
+  //   const house = new THREE.Mesh(houseGeo, houseMat);
+  //   house.position.set(pos.x, 1.5, pos.z);
+  //   scene.add(house);
+
+  //   // Doa
+  //   const doorGeo = new THREE.BoxGeometry(0.8, 1.6, 0.1);
+  //   const doorMat = new THREE.MeshStandardMaterial({ color: 0x442211 });
+  //   const door = new THREE.Mesh(doorGeo, doorMat);
+  //   door.position.set(pos.x, 0.8, pos.z + 1.5);
+  //   scene.add(door);
+
+  //   // Activation Point
+  //   triggers.push({
+  //     position: new THREE.Vector3(pos.x, 0.5, pos.z + 2.2),
+  //     promptPosition: new THREE.Vector3(pos.x, 2.5, pos.z + 1.5),
+  //     type: 'ENTER',
+  //   });
+  // });
+
   //NPC
-  const npcPosition = new THREE.Vector3(0, 0.5, -3);
+  const npcDir = new THREE.Vector3(0.2, 0.9, -0.4);
   const npcMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({color: 0x0088ff}));
-  npcMesh.position.copy(npcPosition);
+  alignToSphere(npcMesh, npcDir, PLANET_RADIUS, 0.5);
   scene.add(npcMesh);
 
   const npcData: NPCData = {
-    position: npcPosition,
+    position: npcMesh.position.clone(),
     name: 'Old guy',
     lines: [
         'Hello! I make games using a toaster',
         'You can see around what I had made',
-        'Interact using Space'
+        'Interact using E'
     ],
   };
 

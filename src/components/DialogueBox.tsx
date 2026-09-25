@@ -37,7 +37,7 @@ export default function DialogueBox({ npcName, lines, onComplete, input }: Dialo
     return () => clearInterval(timer);
   }, [currentLineIndex, fullText]);
 
-  // Capturar la tecla Espacio para controlar el diálogo
+  // Capturar la tecla E para controlar el diálogo
   useEffect(() => {
     if (!input) return;
 
@@ -68,7 +68,7 @@ export default function DialogueBox({ npcName, lines, onComplete, input }: Dialo
       <div className="dialogue-box">
         <div className="npc-name">{npcName}</div>
         <div className="dialogue-text">{displayedText}</div>
-        {!isTyping && <div className="space-indicator">ESPACIO ▶</div>}
+        {!isTyping && <div className="space-indicator">E ▶</div>}
       </div>
 
       <style jsx>{`

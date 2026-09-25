@@ -79,7 +79,7 @@ export default function InterfacePrompt({position, camera, text, visible}: Inter
         >
 
             <div className="prompt-card">
-                <span className="badge">Space</span>
+                <span className="badge">E</span>
                 {
                 //<span className="text">{text}</span>
                 }
