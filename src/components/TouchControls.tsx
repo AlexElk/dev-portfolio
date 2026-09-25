@@ -1,5 +1,6 @@
-'use client'
+'use client';
 
+import { useRef, useState } from "react";
 import { InputHandler } from "../game/InputHandler";
 
 interface TouchControlProps {
@@ -8,72 +9,116 @@ interface TouchControlProps {
 
 export default function TouchControls({input}: TouchControlProps)
 {
-    if (!input) return null;
+    const joystickRef = useRef<HTMLDivElement>(null);
+    const joystickPointerRef = useRef<number | null>(null);
+    const [knobPosition, setKnobPosition] = useState({x: 0, y: 0});
 
-    const handleDirection = (e: React.TouchEvent | React.MouseEvent, key: 'w' | 'a' | 's' | 'd', active: boolean) => {
-        e.stopPropagation();
-        input.setKey(key, active);
-    }
+    const setMovement = (x: number, y: number) => {
+    if (!input) return;
 
-    const handleAction = (e: React.TouchEvent | React.MouseEvent) => {
+        const deadzone = 0.18;
+        input.setKey('a', x < -deadzone);
+        input.setKey('d', x > deadzone);
+        input.setKey('w', y < -deadzone);
+        input.setKey('s', y > deadzone);
+    };
+
+    const updateJoystick = (clientX: number, clientY: number) => {
+        const joystick = joystickRef.current;
+        if (!joystick) return;
+
+        const bounds = joystick.getBoundingClientRect();
+        const radius = bounds.width / 2;
+        const knobRadius = 28;
+        const maxDistance = radius - knobRadius;
+        const offsetX = clientX - (bounds.left + radius);
+        const offsetY = clientY - (bounds.top + radius);
+        const distance = Math.hypot(offsetX, offsetY);
+        const scale = distance > maxDistance ? maxDistance / distance : 1;
+        const knobX = offsetX * scale;
+        const knobY = offsetY * scale;
+
+        setKnobPosition({x: knobX, y: knobY});
+        setMovement(knobX / maxDistance, knobY / maxDistance);
+    };
+
+    const handleJoystickStart = (e: React.PointerEvent<HTMLDivElement>) => {
         e.stopPropagation();
-        if (e.type === 'touchstart' || e.type === 'click') {
-        input.handleSpace();
+        joystickPointerRef.current = e.pointerId;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        updateJoystick(e.clientX, e.clientY);
+    };
+
+    const handleJoystickMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (joystickPointerRef.current !== e.pointerId) return;
+        e.stopPropagation();
+        updateJoystick(e.clientX, e.clientY);
+    };
+
+    const resetJoystick = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (joystickPointerRef.current !== e.pointerId) return;
+        e.stopPropagation();
+        joystickPointerRef.current = null;
+        setKnobPosition({x: 0, y: 0});
+        setMovement(0, 0);
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
         }
     };
 
+    const handleAction = (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        if (!input) return;
+        input.handleSpace();
+    };
+
+    const handleJumpStart = (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        if (!input) return;
+        input.pressJump();
+    };
+
+    const handleJumpEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        if (!input) return;
+        input.releaseJump();
+    };
+
+    if (!input) return null;
+
     return (
         <div className="touch-overlay">
-        {/* D-Pad */}
-        <div className="dpad">
-            <button
-            className="btn dpad-up"
-            onTouchStart={(e) => handleDirection(e, 'w', true)}
-            onTouchEnd={(e) => handleDirection(e, 'w', false)}
-            onMouseDown={(e) => handleDirection(e, 'w', true)}
-            onMouseUp={(e) => handleDirection(e, 'w', false)}
-            >
-            ▲
-            </button>
-            <div className="dpad-row">
-            <button
-                className="btn dpad-left"
-                onTouchStart={(e) => handleDirection(e, 'a', true)}
-                onTouchEnd={(e) => handleDirection(e, 'a', false)}
-                onMouseDown={(e) => handleDirection(e, 'a', true)}
-                onMouseUp={(e) => handleDirection(e, 'a', false)}
-            >
-                ◀
-            </button>
-            <button
-                className="btn dpad-right"
-                onTouchStart={(e) => handleDirection(e, 'd', true)}
-                onTouchEnd={(e) => handleDirection(e, 'd', false)}
-                onMouseDown={(e) => handleDirection(e, 'd', true)}
-                onMouseUp={(e) => handleDirection(e, 'd', false)}
-            >
-                ▶
-            </button>
-            </div>
-            <button
-            className="btn dpad-down"
-            onTouchStart={(e) => handleDirection(e, 's', true)}
-            onTouchEnd={(e) => handleDirection(e, 's', false)}
-            onMouseDown={(e) => handleDirection(e, 's', true)}
-            onMouseUp={(e) => handleDirection(e, 's', false)}
-            >
-            ▼
-            </button>
+        <div
+            ref={joystickRef}
+            className="joystick"
+            onPointerDown={handleJoystickStart}
+            onPointerMove={handleJoystickMove}
+            onPointerUp={resetJoystick}
+            onPointerCancel={resetJoystick}
+            onLostPointerCapture={resetJoystick}
+        >
+            <div
+                className="joystick-knob"
+                style={{transform: `translate(${knobPosition.x}px, ${knobPosition.y}px)`}}
+            />
         </div>
 
-        {/* Action Button */}
-        <div className="action-container">
+        <div className="button-cluster">
             <button
             className="btn btn-action"
-            onTouchStart={handleAction}
-            onClick={handleAction}
+                onPointerDown={handleAction}
             >
-            ACTION
+                ACTION
+            </button>
+            <button
+                className="btn btn-jump"
+                onPointerDown={handleJumpStart}
+                onPointerUp={handleJumpEnd}
+                onPointerCancel={handleJumpEnd}
+                onLostPointerCapture={handleJumpEnd}
+                onPointerLeave={handleJumpEnd}
+            >
+                JUMP
             </button>
         </div>
 
@@ -99,35 +144,54 @@ export default function TouchControls({input}: TouchControlProps)
             }
             }
 
-            .dpad, .action-container {
+            .joystick, .button-cluster {
             pointer-events: auto; /* Enable the button's interact */
             }
 
-            .dpad {
+            .joystick {
+            width: 128px;
+            height: 128px;
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+            backdrop-filter: blur(4px);
+            touch-action: none;
+            position: relative;
+            }
+
+            .joystick-knob {
+            width: 56px;
+            height: 56px;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            margin: -28px 0 0 -28px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+            }
+
+            .button-cluster {
             display: flex;
-            flex-direction: column;
+            gap: 12px;
             align-items: center;
             }
 
-            .dpad-row {
-            display: flex;
-            gap: 32px;
-            }
-
             .btn {
-            width: 52px;
-            height: 52px;
+            width: 64px;
+            height: 64px;
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.5);
             border-radius: 50%;
             color: white;
-            font-size: 16px;
+            font-size: 10px;
             font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(4px);
-            touch-action: manipulation;
+            touch-action: none;
             }
 
             .btn:active {
@@ -136,11 +200,12 @@ export default function TouchControls({input}: TouchControlProps)
             }
 
             .btn-action {
-            width: 72px;
-            height: 72px;
             background: rgba(0, 255, 136, 0.3);
             border-color: #00ff88;
-            font-size: 10px;
+            }
+
+            .btn-jump {
+            background: rgba(255, 255, 255, 0.18);
             }
         `}</style>
         </div>

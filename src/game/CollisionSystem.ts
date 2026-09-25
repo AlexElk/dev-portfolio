@@ -10,8 +10,20 @@ export interface CollisionBody {
   surfaceRadius?: number;
 }
 
+export interface PlatformBody {
+  id: string;
+  normal: THREE.Vector3;
+  right: THREE.Vector3;
+  forward: THREE.Vector3;
+  width: number;
+  depth: number;
+  height: number;
+  planetRadius: number;
+}
+
 export class CollisionSystem {
   private bodies = new Map<string, CollisionBody>();
+  private platforms = new Map<string, PlatformBody>();
 
   public addSphere(
     id: string,
@@ -27,6 +39,38 @@ export class CollisionSystem {
 
   public remove(id: string): void {
     this.bodies.delete(id);
+    this.platforms.delete(id);
+  }
+
+  public addPlatform(platform: PlatformBody): PlatformBody {
+    this.platforms.set(platform.id, platform);
+    return platform;
+  }
+
+  public getPlatformSupportHeight(
+    playerNormal: THREE.Vector3,
+    planetRadius: number,
+    playerRadius: number
+  ): number {
+    let supportHeight = 0;
+
+    for (const platform of this.platforms.values()) {
+      if (platform.planetRadius !== planetRadius) continue;
+
+      const offset = playerNormal.clone()
+        .sub(platform.normal)
+        .multiplyScalar(planetRadius);
+      const localX = offset.dot(platform.right);
+      const localZ = offset.dot(platform.forward);
+      const halfWidth = platform.width / 2 + playerRadius;
+      const halfDepth = platform.depth / 2 + playerRadius;
+
+      if (Math.abs(localX) <= halfWidth && Math.abs(localZ) <= halfDepth) {
+        supportHeight = Math.max(supportHeight, platform.height);
+      }
+    }
+
+    return supportHeight;
   }
 
   public resolvePosition(body: CollisionBody, desiredPosition: THREE.Vector3): THREE.Vector3 {

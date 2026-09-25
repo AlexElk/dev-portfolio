@@ -113,6 +113,17 @@ export default function DialogueBox({ npcName, lines, onComplete, input }: Dialo
           position: relative;
         }
 
+        @media (hover: none) and (pointer: coarse) {
+          .dialogue-container {
+            bottom: 180px;
+            width: calc(100% - 24px);
+          }
+
+          .dialogue-box {
+            padding: 12px 16px;
+          }
+        }
+
         .npc-name {
           color: #00ff88;
           font-weight: bold;

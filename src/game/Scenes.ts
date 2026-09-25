@@ -3,6 +3,7 @@ import { CollisionSystem } from './CollisionSystem';
 import { FlatBounds } from './FlatCollisionSystem';
 import { House } from './entities/House';
 import { NPC } from './entities/NPC';
+import { Platform } from './entities/Platform';
 
 export type { NPCData } from './entities/NPC';
 
@@ -67,6 +68,25 @@ export function setupOverworldScene(scene: THREE.Scene, collisionSystem: Collisi
       promptPosition: house.promptPosition,
       type: 'ENTER'
     });
+  });
+
+  const platformDirections = [
+    new THREE.Vector3(0.2, 0.92, 0.25),
+    new THREE.Vector3(-0.45, 0.78, 0.35),
+  ];
+
+  platformDirections.forEach((direction, index) => {
+    const platform = new Platform({
+      id: `platform-${index}`,
+      direction,
+      planetRadius: PLANET_RADIUS,
+      width: 3.2,
+      depth: 3.2,
+      height: 1.2,
+      thickness: 0.35,
+      color: 0x996633,
+    }, collisionSystem);
+    scene.add(platform.mesh);
   });
 
   // housePositions.forEach((pos) => {

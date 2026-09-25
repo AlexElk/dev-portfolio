@@ -10,6 +10,14 @@ export class Player{
     public planetRadius = 10; //* Maybe get it from the origin
     public collisionRadius = 0.45;
     private speed = 0.12;
+    private readonly groundHeight = 0.5;
+    private readonly minimumJumpVelocity = 0.14;
+    private readonly maximumJumpVelocity = 0.3;
+    private readonly jumpCharge = 0.008;
+    private readonly gravity = 0.012;
+    private jumpHeight = 0;
+    private verticalVelocity = 0;
+    private isGrounded = true;
     private movementMode: PlayerMovementMode = 'SPHERICAL';
     private collisionSystem?: CollisionSystem;
     private collisionBody?: CollisionBody;
@@ -49,6 +57,12 @@ export class Player{
     }
 
     public update(input: InputHandler | null, cameraYaw: number, camera?: THREE.Camera){
+        if (input?.consumeJumpPress() && this.isGrounded) {
+            this.isGrounded = false;
+            this.verticalVelocity = this.minimumJumpVelocity;
+        }
+        this.updateVerticalMotion(input?.jumpHeld ?? false);
+
         if (this.movementMode === 'FLAT') {
             this.updateFlat(input, cameraYaw);
             return;
@@ -102,7 +116,9 @@ export class Player{
 
                 //Keep the player in the surface
                 const newNormal = this.mesh.position.clone().normalize();
-                this.mesh.position.copy(newNormal.clone().multiplyScalar(this.planetRadius + 0.5));
+                this.mesh.position.copy(newNormal.clone().multiplyScalar(this.planetRadius + this.groundHeight));
+                this.updateSphericalSupport(newNormal);
+                this.applySphericalHeight(newNormal);
 
                 //Orientation
                 const moveRight = new THREE.Vector3()
@@ -124,6 +140,9 @@ export class Player{
                 // this.mesh.rotation.y = angle;
             }
         }
+
+        this.updateSphericalSupport(normal);
+        this.applySphericalHeight(normal);
 
         // Keep the current heading while adapting it to the new surface normal.
         const currentForward = new THREE.Vector3(0, 0, -1)
@@ -147,13 +166,16 @@ export class Player{
     }
 
     private updateFlat(input: InputHandler | null, cameraYaw: number): void {
-        if (!input || !this.flatCollisionSystem) return;
+        if (!this.flatCollisionSystem) return;
 
         const inputVector = new THREE.Vector2(
-            Number(input.keys.d) - Number(input.keys.a),
-            Number(input.keys.s) - Number(input.keys.w)
+            Number(input?.keys.d) - Number(input?.keys.a),
+            Number(input?.keys.s) - Number(input?.keys.w)
         );
-        if (inputVector.lengthSq() === 0) return;
+        if (inputVector.lengthSq() === 0) {
+            this.mesh.position.y = this.groundHeight + this.jumpHeight;
+            return;
+        }
 
         inputVector.normalize();
         const forward = new THREE.Vector3(
@@ -177,6 +199,7 @@ export class Player{
         );
 
         this.mesh.position.copy(resolvedPosition);
+        this.mesh.position.y = this.groundHeight + this.jumpHeight;
         const targetMatrix = new THREE.Matrix4().makeBasis(
             right,
             new THREE.Vector3(0, 1, 0),
@@ -185,5 +208,50 @@ export class Player{
         const targetQuaternion = new THREE.Quaternion()
             .setFromRotationMatrix(targetMatrix);
         this.mesh.quaternion.slerp(targetQuaternion, 0.3);
+    }
+
+    private updateVerticalMotion(jumpHeld: boolean): void {
+        if (this.isGrounded) return;
+
+        if (jumpHeld) {
+            this.verticalVelocity = Math.min(
+                this.maximumJumpVelocity,
+                this.verticalVelocity + this.jumpCharge
+            );
+        }
+
+        this.jumpHeight += this.verticalVelocity;
+        this.verticalVelocity -= this.gravity;
+
+        if (this.jumpHeight <= 0) {
+            this.jumpHeight = 0;
+            this.verticalVelocity = 0;
+            this.isGrounded = true;
+        }
+    }
+
+    private applySphericalHeight(normal: THREE.Vector3): void {
+        this.mesh.position.copy(normal)
+            .multiplyScalar(this.planetRadius + this.groundHeight + this.jumpHeight);
+    }
+
+    private updateSphericalSupport(normal: THREE.Vector3): void {
+        const supportHeight = this.collisionSystem?.getPlatformSupportHeight(
+            normal,
+            this.planetRadius,
+            this.collisionRadius
+        ) ?? 0;
+
+        if (this.isGrounded && this.jumpHeight > supportHeight + 0.01) {
+            this.isGrounded = false;
+            this.verticalVelocity = 0;
+            return;
+        }
+
+        if (!this.isGrounded && this.verticalVelocity <= 0 && this.jumpHeight <= supportHeight + 0.02) {
+            this.jumpHeight = supportHeight;
+            this.verticalVelocity = 0;
+            this.isGrounded = true;
+        }
     }
 }
