@@ -1,7 +1,7 @@
 // src/components/DialogueBox.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { InputHandler } from '../game/InputHandler';
 
 interface DialogueBoxProps {
@@ -17,51 +17,69 @@ export default function DialogueBox({ npcName, lines, onComplete, input }: Dialo
   const [isTyping, setIsTyping] = useState(true);
 
   const fullText = lines[currentLineIndex] || '';
+  const dialogueStateRef = useRef({ currentLineIndex, fullText, isTyping });
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    dialogueStateRef.current = { currentLineIndex, fullText, isTyping };
+    onCompleteRef.current = onComplete;
+  }, [currentLineIndex, fullText, isTyping, onComplete]);
 
   // Efecto Máquina de Escribir
   useEffect(() => {
-    setDisplayedText('');
-    setIsTyping(true);
     let charIndex = 0;
+    let timer: ReturnType<typeof setInterval>;
+    const resetTimer = setTimeout(() => {
+      setDisplayedText('');
+      setIsTyping(fullText.length > 0);
 
-    const timer = setInterval(() => {
-      if (charIndex < fullText.length) {
-        setDisplayedText((prev) => prev + fullText[charIndex]);
-        charIndex++;
-      } else {
-        setIsTyping(false);
-        clearInterval(timer);
-      }
-    }, 30); // Velocidad: 30ms por letra
+      timer = setInterval(() => {
+        if (charIndex < fullText.length) {
+          charIndex += 1;
+          setDisplayedText(fullText.slice(0, charIndex));
 
-    return () => clearInterval(timer);
+          if (charIndex === fullText.length) {
+            setIsTyping(false);
+            clearInterval(timer);
+          }
+        } else {
+          setIsTyping(false);
+          clearInterval(timer);
+        }
+      }, 30); // Velocidad: 30ms por letra
+    }, 0);
+
+    return () => {
+      clearTimeout(resetTimer);
+      if (timer) clearInterval(timer);
+    };
   }, [currentLineIndex, fullText]);
 
   // Capturar la tecla E para controlar el diálogo
   useEffect(() => {
     if (!input) return;
 
-    const originalHandleSpace = input.handleSpace.bind(input);
+    const actionHandler = () => {
+      const { currentLineIndex: lineIndex, fullText: text, isTyping: typing } = dialogueStateRef.current;
 
-    input.handleSpace = () => {
-      if (isTyping) {
+      if (typing) {
         // 1. Si aún se escribe, mostrar la frase completa de inmediato
-        setDisplayedText(fullText);
+        setDisplayedText(text);
         setIsTyping(false);
-      } else {
+      } else if (lineIndex < lines.length - 1) {
         // 2. Si terminó de escribirse, avanzar o cerrar
-        if (currentLineIndex < lines.length - 1) {
-          setCurrentLineIndex((prev) => prev + 1);
-        } else {
-          onComplete(); // Fin del diálogo
-        }
+        setCurrentLineIndex((prev) => prev + 1);
+      } else {
+        onCompleteRef.current(); // Fin del diálogo
       }
     };
 
+    const previousHandler = input.setActionHandler(actionHandler);
+
     return () => {
-      input.handleSpace = originalHandleSpace;
+      input.restoreActionHandler(previousHandler);
     };
-  }, [input, isTyping, fullText, currentLineIndex, lines, onComplete]);
+  }, [input, lines.length]);
 
   return (
     <div className="dialogue-container">

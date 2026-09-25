@@ -1,15 +1,15 @@
 import * as THREE from 'three';
+import { CollisionSystem } from './CollisionSystem';
+import { FlatBounds } from './FlatCollisionSystem';
+import { House } from './entities/House';
+import { NPC } from './entities/NPC';
+
+export type { NPCData } from './entities/NPC';
 
 export interface HouseTrigger {
   position: THREE.Vector3;
   promptPosition: THREE.Vector3;
   type: 'ENTER' | 'EXIT';
-}
-
-export interface NPCData {
-    position: THREE.Vector3;
-    name: string;
-    lines: string[];
 }
 
 export function alignToSphere(
@@ -24,7 +24,7 @@ export function alignToSphere(
   object.quaternion.copy(q);
 }
 
-export function setupOverworldScene(scene: THREE.Scene) {
+export function setupOverworldScene(scene: THREE.Scene, collisionSystem: CollisionSystem) {
 
   const PLANET_RADIUS = 10;
   scene.background = new THREE.Color(0x020208);
@@ -54,21 +54,17 @@ export function setupOverworldScene(scene: THREE.Scene) {
 
   const triggers: HouseTrigger[] = [];
 
-  houseDirections.forEach((dir) => {
-    const house = new THREE.Mesh(
-      new THREE.BoxGeometry(2.5, 2.5, 2.5),
-      new THREE.MeshStandardMaterial({color: 0xaa4444})
-    );
-    alignToSphere(house, dir, PLANET_RADIUS, 1.25);
-    scene.add(house);
-
-    const normal = dir.clone().normalize();
-    const triggerPos = normal.clone().multiplyScalar(PLANET_RADIUS + 0.5);
-    const promptPos = normal.clone().multiplyScalar(PLANET_RADIUS + 3.2);
+  houseDirections.forEach((dir, index) => {
+    const house = new House({
+      id: `house-${index}`,
+      direction: dir,
+      planetRadius: PLANET_RADIUS,
+    }, collisionSystem);
+    scene.add(house.mesh);
 
     triggers.push({
-      position: triggerPos,
-      promptPosition: promptPos,
+      position: house.triggerPosition,
+      promptPosition: house.promptPosition,
       type: 'ENTER'
     });
   });
@@ -97,26 +93,29 @@ export function setupOverworldScene(scene: THREE.Scene) {
   // });
 
   //NPC
-  const npcDir = new THREE.Vector3(0.2, 0.9, -0.4);
-  const npcMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({color: 0x0088ff}));
-  alignToSphere(npcMesh, npcDir, PLANET_RADIUS, 0.5);
-  scene.add(npcMesh);
-
-  const npcData: NPCData = {
-    position: npcMesh.position.clone(),
+  const npc = new NPC({
+    id: 'old-guy',
+    direction: new THREE.Vector3(0.2, 0.9, -0.4),
+    planetRadius: PLANET_RADIUS,
     name: 'Old guy',
     lines: [
         'Hello! I make games using a toaster',
         'You can see around what I had made',
         'Interact using E'
     ],
-  };
+  }, collisionSystem);
+  scene.add(npc.mesh);
 
-  return {triggers, npcData};
+  return {triggers, npcData: npc.data};
 }
 
 // Inside
-export function setupInteriorScene(scene: THREE.Scene): HouseTrigger[] {
+export interface InteriorSceneData {
+  triggers: HouseTrigger[];
+  bounds: FlatBounds;
+}
+
+export function setupInteriorScene(scene: THREE.Scene): InteriorSceneData {
   // Suelo de madera
   const floorGeo = new THREE.PlaneGeometry(8, 8);
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x553311, side: THREE.DoubleSide });
@@ -137,14 +136,23 @@ export function setupInteriorScene(scene: THREE.Scene): HouseTrigger[] {
   createWall(0.2, 3, 8, -4, 1.5, 0); // Pared Izquierda
   createWall(0.2, 3, 8, 4, 1.5, 0);  // Pared Derecha
 
-  // Salida
-  return [
-    {
-      position: new THREE.Vector3(0, 0.5, 3),
-      promptPosition: new THREE.Vector3(0, 2, 3.5),
-      type: 'EXIT',
+  // The walls occupy the outer 0.1 units of the room. Leave space for the
+  // player's collision radius inside those inner faces.
+  return {
+    triggers: [
+      {
+        position: new THREE.Vector3(0, 0.5, 3),
+        promptPosition: new THREE.Vector3(0, 2, 3.5),
+        type: 'EXIT',
+      },
+    ],
+    bounds: {
+      minX: -4,
+      maxX: 4,
+      minZ: -4,
+      maxZ: 4,
     },
-  ];
+  };
 }
 
 export function setupMenuScene(scene: THREE.Scene) {

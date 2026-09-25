@@ -7,6 +7,8 @@ import { createScene } from '../game/SceneSetUp';
 import { InputHandler } from '../game/InputHandler';
 import { Player } from '../game/Player';
 import { CameraController } from '../game/CameraController';
+import { CollisionSystem } from '../game/CollisionSystem';
+import { FlatCollisionSystem } from '../game/FlatCollisionSystem';
 import { setupOverworldScene, setupInteriorScene, HouseTrigger, NPCData } from '../game/Scenes';
 import TouchControls from './TouchControls';
 import MenuOverlay from './MenuOverlay';
@@ -45,7 +47,8 @@ export default function GameCanvas() {
 
     const { scene, camera: mainCam, renderer, cleanup: cleanupScene } = createScene(containerRef.current);
     const input = new InputHandler();
-    const player = new Player();
+    const collisionSystem = new CollisionSystem();
+    const player = new Player(collisionSystem);
     const cameraController = new CameraController(mainCam, containerRef.current);
 
     cameraControllerRef.current = cameraController;
@@ -59,17 +62,21 @@ export default function GameCanvas() {
     // Cargar elementos 3D según el estado actual
     if (sceneState === 'OVERWORLD') {
       scene.add(player.mesh);
-      const res = setupOverworldScene(scene);
+      const res = setupOverworldScene(scene, collisionSystem);
       triggers = res.triggers;
       npcData = res.npcData;
     } else if (sceneState === 'INTERIOR') {
       player.mesh.position.set(0, 0.5, 2); // Posición de entrada
+      const interior = setupInteriorScene(scene);
+      player.setFlatMovement(new FlatCollisionSystem(interior.bounds));
+      cameraController.setMode('FLAT');
+      cameraController.setFlatBounds(interior.bounds);
       scene.add(player.mesh);
-      triggers = setupInteriorScene(scene);
+      triggers = interior.triggers;
     }
 
     // Sobrescribir la acción de la tecla E
-    input.handleSpace = () => {
+    input.setActionHandler(() => {
         if (isDialogueActiveRef.current) return;
 
         if (activeNpcRef.current) {
@@ -89,7 +96,7 @@ export default function GameCanvas() {
           setSceneState('OVERWORLD');
         }
       }
-    };
+    });
 
     let animId: number;
     const animate = () => {

@@ -1,5 +1,8 @@
 export class InputHandler{
     public keys = {w: false, a: false, s:false, d: false};
+    private actionHandler = () => {
+        console.log("Action!");
+    };
 
     constructor(){
         window.addEventListener('keydown', this.handleKeyDown);
@@ -8,7 +11,17 @@ export class InputHandler{
 
     public handleSpace()
     {
-        console.log("Action!");
+        this.actionHandler();
+    }
+
+    public setActionHandler(handler: () => void): () => void {
+        const previousHandler = this.actionHandler;
+        this.actionHandler = handler;
+        return previousHandler;
+    }
+
+    public restoreActionHandler(handler: () => void): void {
+        this.actionHandler = handler;
     }
 
     private handleKeyDown = (e: KeyboardEvent) => {

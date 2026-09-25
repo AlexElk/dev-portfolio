@@ -1,13 +1,19 @@
 import * as THREE from "three";
+import type { FlatBounds } from "./FlatCollisionSystem";
+
+export type CameraMode = 'SPHERICAL' | 'FLAT';
 
 export class CameraController{
     public camera: THREE.PerspectiveCamera;
     public domElement: HTMLElement;
     public yaw = 0; //Horizontal Angle
     public pitch = 0.3 //Vertical Angle
+    public mode: CameraMode = 'SPHERICAL';
 
     private distance = 7;
     private heightOffset = 1.2;
+    private readonly maxPitch = THREE.MathUtils.degToRad(70);
+    private flatBounds?: FlatBounds;
 
     private inDialog = false;
     private dialogueCamPos = new THREE.Vector3();
@@ -41,6 +47,14 @@ export class CameraController{
 
     public endDialogueMode() {
         this.inDialog = false;
+    }
+
+    public setMode(mode: CameraMode): void {
+        this.mode = mode;
+    }
+
+    public setFlatBounds(bounds: FlatBounds): void {
+        this.flatBounds = bounds;
     }
 
     private setupEvents(element: HTMLElement ){
@@ -109,9 +123,9 @@ export class CameraController{
         this.yaw -= deltaYaw;
         this.pitch += deltaPitch;
 
-        const maxPitch = Math.PI / 2 -0.1;
+        //const maxPitch = Math.PI / 2 -0.1;
         const minPitch = -0.1;
-        this.pitch = Math.max(minPitch, Math.min(maxPitch, this.pitch));
+        this.pitch = Math.max(minPitch, Math.min(this.maxPitch, this.pitch));
     }
 
     public update(targetPosition: THREE.Vector3)
@@ -124,6 +138,11 @@ export class CameraController{
             //Smooth transition
             this.camera.position.lerp(this.dialogueCamPos, 0.08);
             this.camera.lookAt(this.dialogueLookAt);
+            return;
+        }
+
+        if (this.mode === 'FLAT') {
+            this.updateFlat(targetPosition);
             return;
         }
 
@@ -167,5 +186,32 @@ export class CameraController{
         // const offSetZ = this.distance * Math.cos(this.yaw) * Math.cos(this.pitch);
 
         // const desiredPos = new THREE.Vector3(target.x + offSetX, target.y + offSetY, target.z + offSetZ);
+    }
+
+    private updateFlat(targetPosition: THREE.Vector3): void {
+        const target = targetPosition.clone().add(new THREE.Vector3(0, 0.8, 0));
+        const horizontalDistance = this.distance * Math.cos(this.pitch);
+        const desiredCameraPosition = target.clone().add(new THREE.Vector3(
+            Math.sin(this.yaw) * horizontalDistance,
+            this.distance * Math.sin(this.pitch),
+            Math.cos(this.yaw) * horizontalDistance
+        ));
+
+        if (this.flatBounds) {
+            desiredCameraPosition.x = THREE.MathUtils.clamp(
+                desiredCameraPosition.x,
+                this.flatBounds.minX + 0.2,
+                this.flatBounds.maxX - 0.2
+            );
+            desiredCameraPosition.z = THREE.MathUtils.clamp(
+                desiredCameraPosition.z,
+                this.flatBounds.minZ + 0.2,
+                this.flatBounds.maxZ - 0.2
+            );
+        }
+
+        this.camera.up.lerp(new THREE.Vector3(0, 1, 0), 0.1);
+        this.camera.position.lerp(desiredCameraPosition, 0.1);
+        this.camera.lookAt(target);
     }
 }
