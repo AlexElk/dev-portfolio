@@ -11,6 +11,7 @@ export interface NPCConfig {
   size?: number;
   color?: number;
   collisionRadius?: number;
+  modelFactory?: () => THREE.Object3D;
 }
 
 export interface NPCData {
@@ -20,7 +21,7 @@ export interface NPCData {
 }
 
 export class NPC {
-  public readonly mesh: THREE.Mesh;
+  public readonly mesh: THREE.Object3D;
   public readonly data: NPCData;
   public readonly collider: CollisionBody;
 
@@ -32,7 +33,7 @@ export class NPC {
     const collisionRadius = config.collisionRadius ?? 0.55;
     const surfaceNormal = config.direction.clone().normalize();
 
-    this.mesh = new THREE.Mesh(
+    this.mesh = config.modelFactory?.() ?? new THREE.Mesh(
       new THREE.BoxGeometry(size, size, size),
       new THREE.MeshBasicMaterial({ color })
     );

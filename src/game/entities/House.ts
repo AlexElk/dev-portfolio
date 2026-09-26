@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { CollisionBody, CollisionSystem } from '../CollisionSystem';
 
+export interface HouseContent {
+  name: string;
+  interiorColor: number;
+  url: string;
+}
+
 export interface HouseConfig {
   id: string;
   direction: THREE.Vector3;
@@ -9,14 +15,17 @@ export interface HouseConfig {
   size?: number;
   color?: number;
   collisionRadius?: number;
+  modelFactory?: () => THREE.Object3D;
+  content: HouseContent;
 }
 
 export class House {
-  public readonly mesh: THREE.Mesh;
+  public readonly mesh: THREE.Object3D;
   public readonly surfaceNormal: THREE.Vector3;
   public readonly triggerPosition: THREE.Vector3;
   public readonly promptPosition: THREE.Vector3;
   public readonly collider: CollisionBody;
+  public readonly content: HouseContent;
 
   constructor(config: HouseConfig, collisionSystem: CollisionSystem) {
     const planetRadius = config.planetRadius ?? 10;
@@ -24,9 +33,10 @@ export class House {
     const size = config.size ?? 2.5;
     const color = config.color ?? 0xaa4444;
     const collisionRadius = config.collisionRadius ?? 1.25;
+    this.content = config.content;
 
     this.surfaceNormal = config.direction.clone().normalize();
-    this.mesh = new THREE.Mesh(
+    this.mesh = config.modelFactory?.() ?? new THREE.Mesh(
       new THREE.BoxGeometry(size, size, size),
       new THREE.MeshStandardMaterial({ color })
     );

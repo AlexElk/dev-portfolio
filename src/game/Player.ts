@@ -6,7 +6,7 @@ import { FlatCollisionSystem } from "./FlatCollisionSystem";
 export type PlayerMovementMode = 'SPHERICAL' | 'FLAT';
 
 export class Player{
-    public mesh: THREE.Mesh;
+    public mesh: THREE.Group;
     public planetRadius = 10; //* Maybe get it from the origin
     public collisionRadius = 0.45;
     private speed = 0.12;
@@ -34,8 +34,16 @@ export class Player{
         const face = new THREE.Mesh(faceGeometry, faceMaterial);
         face.position.set(0, 0.2, -0.5);
 
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.add(face);
+        const body = new THREE.Mesh(geometry, material);
+        const visualRoot = new THREE.Group();
+        visualRoot.add(body);
+        this.mesh = new THREE.Group();
+        body.add(face);
+
+        const visualBounds = new THREE.Box3().setFromObject(visualRoot);
+        const visualCenter = visualBounds.getCenter(new THREE.Vector3());
+        visualRoot.position.sub(visualCenter);
+        this.mesh.add(visualRoot);
 
         const initialNormal = new THREE.Vector3(0,1,0); //North pole
         this.mesh.position.copy(initialNormal.multiplyScalar(this.planetRadius + 0.5));
@@ -178,16 +186,20 @@ export class Player{
         }
 
         inputVector.normalize();
-        const forward = new THREE.Vector3(
-            Math.sin(cameraYaw),
-            0,
-            -Math.cos(cameraYaw)
-        );
-        const right = new THREE.Vector3(
-            Math.cos(cameraYaw),
-            0,
-            Math.sin(cameraYaw)
-        );
+        const forward = new THREE.Vector3(0, 0, -1)
+            .applyQuaternion(this.mesh.quaternion);
+        forward.y = 0;
+        if (forward.lengthSq() < 1e-6) {
+            forward.set(
+                Math.sin(cameraYaw),
+                0,
+                -Math.cos(cameraYaw)
+            );
+        }
+        forward.normalize();
+        const right = new THREE.Vector3()
+            .crossVectors(forward, new THREE.Vector3(0, 1, 0))
+            .normalize();
         const moveDirection = forward.multiplyScalar(-inputVector.y)
             .addScaledVector(right, inputVector.x)
             .normalize();
@@ -200,14 +212,17 @@ export class Player{
 
         this.mesh.position.copy(resolvedPosition);
         this.mesh.position.y = this.groundHeight + this.jumpHeight;
+        const moveRight = new THREE.Vector3()
+            .crossVectors(moveDirection, new THREE.Vector3(0, 1, 0))
+            .normalize();
         const targetMatrix = new THREE.Matrix4().makeBasis(
-            right,
+            moveRight,
             new THREE.Vector3(0, 1, 0),
             moveDirection.clone().negate()
         );
         const targetQuaternion = new THREE.Quaternion()
             .setFromRotationMatrix(targetMatrix);
-        this.mesh.quaternion.slerp(targetQuaternion, 0.3);
+        this.mesh.quaternion.slerp(targetQuaternion, 0.1);
     }
 
     private updateVerticalMotion(jumpHeld: boolean): void {

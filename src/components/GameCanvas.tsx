@@ -9,7 +9,7 @@ import { Player } from '../game/Player';
 import { CameraController } from '../game/CameraController';
 import { CollisionSystem } from '../game/CollisionSystem';
 import { FlatCollisionSystem } from '../game/FlatCollisionSystem';
-import { setupOverworldScene, setupInteriorScene, HouseTrigger, NPCData } from '../game/Scenes';
+import { setupOverworldScene, setupInteriorScene, HouseTrigger, NPCData, HouseContent } from '../game/Scenes';
 import TouchControls from './TouchControls';
 import MenuOverlay from './MenuOverlay';
 import InteractionPrompt from './InteractionPrompt';
@@ -40,6 +40,7 @@ export default function GameCanvas() {
 
   const activeTriggerRef = useRef<HouseTrigger | null>(null);
   const activeNpcRef = useRef<NPCData | null>(null);
+  const activeHouseContentRef = useRef<HouseContent | null>(null);
   const isDialogueActiveRef = useRef(false);
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export default function GameCanvas() {
     setInputHandler(input);
 
     let triggers: HouseTrigger[] = [];
-    let npcData: NPCData | null = null;
+    let npcData: NPCData[] = [];
 
     // Cargar elementos 3D según el estado actual
     if (sceneState === 'OVERWORLD') {
@@ -67,10 +68,13 @@ export default function GameCanvas() {
       npcData = res.npcData;
     } else if (sceneState === 'INTERIOR') {
       player.mesh.position.set(0, 0.5, 2); // Posición de entrada
-      const interior = setupInteriorScene(scene);
+      const interior = setupInteriorScene(scene, activeHouseContentRef.current ?? undefined);
       player.setFlatMovement(new FlatCollisionSystem(interior.bounds));
       cameraController.setMode('FLAT');
-      cameraController.setFlatBounds(interior.bounds);
+      cameraController.setFlatView(
+        new THREE.Vector3(0, 5.5, 8),
+        new THREE.Vector3(0, 0.8, 0)
+      );
       scene.add(player.mesh);
       triggers = interior.triggers;
     }
@@ -91,7 +95,11 @@ export default function GameCanvas() {
 
       if (activeTriggerRef.current) {
         if (activeTriggerRef.current.type === 'ENTER') {
+          activeHouseContentRef.current = activeTriggerRef.current.houseContent ?? null;
           setSceneState('INTERIOR');
+        } else if (activeTriggerRef.current.type === 'LINK') {
+          const url = activeTriggerRef.current.houseContent?.url;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
         } else if (activeTriggerRef.current.type === 'EXIT') {
           setSceneState('OVERWORLD');
         }
@@ -109,10 +117,16 @@ export default function GameCanvas() {
         }
         cameraController.update(player.mesh.position);
 
-        if (npcData) {
-          const distToNpc = player.mesh.position.distanceTo(npcData.position);
-          activeNpcRef.current = distToNpc < 1.8 ? npcData : null;
+        let closestNpc: NPCData | null = null;
+        let closestNpcDistance = 1.8;
+        for (const candidate of npcData) {
+          const distanceToNpc = player.mesh.position.distanceTo(candidate.position);
+          if (distanceToNpc < closestNpcDistance) {
+            closestNpc = candidate;
+            closestNpcDistance = distanceToNpc;
+          }
         }
+        activeNpcRef.current = closestNpc;
 
         // Detectar cercanía con zonas de interacción
         let nearTrigger: HouseTrigger | null = null;

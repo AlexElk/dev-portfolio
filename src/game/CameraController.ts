@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import type { FlatBounds } from "./FlatCollisionSystem";
 
 export type CameraMode = 'SPHERICAL' | 'FLAT';
 
@@ -13,7 +12,8 @@ export class CameraController{
     private distance = 7;
     private heightOffset = 1.2;
     private readonly maxPitch = THREE.MathUtils.degToRad(70);
-    private flatBounds?: FlatBounds;
+    private flatCameraPosition = new THREE.Vector3(0, 5.5, 8);
+    private flatCameraTarget = new THREE.Vector3(0, 0.8, 0);
 
     private inDialog = false;
     private dialogueCamPos = new THREE.Vector3();
@@ -53,8 +53,9 @@ export class CameraController{
         this.mode = mode;
     }
 
-    public setFlatBounds(bounds: FlatBounds): void {
-        this.flatBounds = bounds;
+    public setFlatView(position: THREE.Vector3, target: THREE.Vector3): void {
+        this.flatCameraPosition.copy(position);
+        this.flatCameraTarget.copy(target);
     }
 
     private setupEvents(element: HTMLElement ){
@@ -142,7 +143,7 @@ export class CameraController{
         }
 
         if (this.mode === 'FLAT') {
-            this.updateFlat(targetPosition);
+            this.updateFlat();
             return;
         }
 
@@ -188,30 +189,10 @@ export class CameraController{
         // const desiredPos = new THREE.Vector3(target.x + offSetX, target.y + offSetY, target.z + offSetZ);
     }
 
-    private updateFlat(targetPosition: THREE.Vector3): void {
-        const target = targetPosition.clone().add(new THREE.Vector3(0, 0.8, 0));
-        const horizontalDistance = this.distance * Math.cos(this.pitch);
-        const desiredCameraPosition = target.clone().add(new THREE.Vector3(
-            Math.sin(this.yaw) * horizontalDistance,
-            this.distance * Math.sin(this.pitch),
-            Math.cos(this.yaw) * horizontalDistance
-        ));
-
-        if (this.flatBounds) {
-            desiredCameraPosition.x = THREE.MathUtils.clamp(
-                desiredCameraPosition.x,
-                this.flatBounds.minX + 0.2,
-                this.flatBounds.maxX - 0.2
-            );
-            desiredCameraPosition.z = THREE.MathUtils.clamp(
-                desiredCameraPosition.z,
-                this.flatBounds.minZ + 0.2,
-                this.flatBounds.maxZ - 0.2
-            );
-        }
-
-        this.camera.up.lerp(new THREE.Vector3(0, 1, 0), 0.1);
-        this.camera.position.lerp(desiredCameraPosition, 0.1);
-        this.camera.lookAt(target);
+    private updateFlat(): void {
+        this.camera.up.set(0, 1, 0);
+        this.camera.position.copy(this.flatCameraPosition);
+        this.camera.lookAt(this.flatCameraTarget);
     }
 }
+

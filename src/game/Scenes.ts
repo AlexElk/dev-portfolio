@@ -1,16 +1,18 @@
 import * as THREE from 'three';
 import { CollisionSystem } from './CollisionSystem';
 import { FlatBounds } from './FlatCollisionSystem';
-import { House } from './entities/House';
+import { House, HouseContent } from './entities/House';
 import { NPC } from './entities/NPC';
 import { Platform } from './entities/Platform';
 
 export type { NPCData } from './entities/NPC';
+export type { HouseContent } from './entities/House';
 
 export interface HouseTrigger {
   position: THREE.Vector3;
   promptPosition: THREE.Vector3;
-  type: 'ENTER' | 'EXIT';
+  type: 'ENTER' | 'EXIT' | 'LINK';
+  houseContent?: HouseContent;
 }
 
 export function alignToSphere(
@@ -47,32 +49,47 @@ export function setupOverworldScene(scene: THREE.Scene, collisionSystem: Collisi
   const planet = new THREE.Mesh(planetGeo, planetMat);
   scene.add(planet);
   
-  const houseDirections = [
-    new THREE.Vector3(-0.5, 0.8, -0.3),
-    new THREE.Vector3(0.6, 0.7, 0.4),
-    new THREE.Vector3(-0.5, 0.8, 0.3)
-  ]
+  const houseDirections = Array.from({ length: 10 }, (_, index) => {
+    const angle = (index / 10) * Math.PI * 2;
+    return new THREE.Vector3(
+      Math.cos(angle),
+      0.35,
+      Math.sin(angle)
+    );
+  });
 
   const triggers: HouseTrigger[] = [];
 
   houseDirections.forEach((dir, index) => {
+    const houseContent: HouseContent = {
+      name: `House ${index + 1}`,
+      interiorColor: [0xff5555, 0xff9955, 0xffdd55, 0x88cc66, 0x44bb99,
+        0x55aadd, 0x7777dd, 0xaa66cc, 0xdd66aa, 0xcc8866][index],
+      url: 'https://github.com',
+    };
     const house = new House({
       id: `house-${index}`,
       direction: dir,
       planetRadius: PLANET_RADIUS,
+      content: houseContent,
     }, collisionSystem);
     scene.add(house.mesh);
 
     triggers.push({
       position: house.triggerPosition,
       promptPosition: house.promptPosition,
-      type: 'ENTER'
+      type: 'ENTER',
+      houseContent: house.content,
     });
   });
 
   const platformDirections = [
-    new THREE.Vector3(0.2, 0.92, 0.25),
-    new THREE.Vector3(-0.45, 0.78, 0.35),
+    new THREE.Vector3(0.18, 0.95, 0.18),
+    new THREE.Vector3(0.28, 0.89, 0.36),
+    new THREE.Vector3(0.4, 0.8, 0.5),
+    new THREE.Vector3(0.55, 0.68, 0.62),
+    new THREE.Vector3(0.7, 0.52, 0.58),
+    new THREE.Vector3(0.8, 0.38, 0.48),
   ];
 
   platformDirections.forEach((direction, index) => {
@@ -112,21 +129,39 @@ export function setupOverworldScene(scene: THREE.Scene, collisionSystem: Collisi
   //   });
   // });
 
-  //NPC
-  const npc = new NPC({
-    id: 'old-guy',
-    direction: new THREE.Vector3(0.2, 0.9, -0.4),
-    planetRadius: PLANET_RADIUS,
-    name: 'Old guy',
-    lines: [
+  const npcConfigs = [
+    {
+      id: 'old-guy',
+      direction: new THREE.Vector3(0.05, 0.98, 0.05),
+      name: 'Old guy',
+      lines: [
         'Hello! I make games using a toaster',
         'You can see around what I had made',
-        'Interact using E'
-    ],
-  }, collisionSystem);
-  scene.add(npc.mesh);
+        'Interact using E',
+      ],
+    },
+    {
+      id: 'platform-guide',
+      direction: new THREE.Vector3(0.78, 0.42, 0.45),
+      name: 'Platform guide',
+      lines: [
+        'The platforms follow the curve of the planet.',
+        'Hold Space to jump higher and reach the next one.',
+        'Try not to fall.',
+      ],
+    },
+  ];
 
-  return {triggers, npcData: npc.data};
+  const npcData = npcConfigs.map((config) => {
+    const npc = new NPC({
+      ...config,
+      planetRadius: PLANET_RADIUS,
+    }, collisionSystem);
+    scene.add(npc.mesh);
+    return npc.data;
+  });
+
+  return {triggers, npcData};
 }
 
 // Inside
@@ -135,13 +170,23 @@ export interface InteriorSceneData {
   bounds: FlatBounds;
 }
 
-export function setupInteriorScene(scene: THREE.Scene): InteriorSceneData {
+export function setupInteriorScene(scene: THREE.Scene, houseContent?: HouseContent): InteriorSceneData {
   // Suelo de madera
   const floorGeo = new THREE.PlaneGeometry(8, 8);
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x553311, side: THREE.DoubleSide });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = Math.PI / 2;
   scene.add(floor);
+
+  const interiorObject = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 1.2, 1.2),
+    new THREE.MeshStandardMaterial({
+      color: houseContent?.interiorColor ?? 0x00ff88,
+    })
+  );
+  interiorObject.position.set(0, 0.6, 0);
+  interiorObject.userData.houseContent = houseContent;
+  scene.add(interiorObject);
 
   // Paredes de cajas
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x888899 });
@@ -165,6 +210,12 @@ export function setupInteriorScene(scene: THREE.Scene): InteriorSceneData {
         promptPosition: new THREE.Vector3(0, 2, 3.5),
         type: 'EXIT',
       },
+      ...(houseContent ? [{
+        position: new THREE.Vector3(0, 0.5, 0),
+        promptPosition: new THREE.Vector3(0, 2, 0),
+        type: 'LINK' as const,
+        houseContent,
+      }] : []),
     ],
     bounds: {
       minX: -4,
